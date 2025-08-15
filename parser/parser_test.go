@@ -116,16 +116,19 @@ func TestIdentifierExpression(t *testing.T) {
 
 	checkParserErrors(t, p)
 
+	// Our test case is a single statement
 	if len(program.Statements) != 1 {
 		t.Fatalf("program has not enough statments, got %d", len(program.Statements))
 	}
 
 	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 
+	// It should be parsed as an ExpressionStatment
 	if !ok {
 		t.Fatalf("program.Statements[0] is not ast.ExpressionStatment, got %T", program.Statements[0])
 	}
 
+	// The expression of the statement should be an Identifier (as opposed to some other value)
 	ident, ok := stmt.Expression.(*ast.Identifier)
 
 	if !ok {
@@ -140,4 +143,36 @@ func TestIdentifierExpression(t *testing.T) {
 		t.Errorf("ident.TokenLiteral not %s, got %s", "foobar", ident.TokenLiteral())
 	}
 
+}
+
+func TestIntegerExpression(t *testing.T) {
+	input := `5;`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements length should be 1, got %d instead", len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+
+	if !ok {
+		t.Fatalf("program.Statements[0] should be ExpressionStatement, got %T instead", program.Statements[0])
+	}
+
+	il, ok := stmt.Expression.(*ast.IntegerLiteral)
+
+	if !ok {
+		t.Fatalf("il should have been IntegerLiteral, instead got %T", stmt.Expression)
+	}
+
+	if il.Value != 5 {
+		t.Fatalf("il.Value should have been 5, instead got %d", il.Value)
+	}
+
+	if il.TokenLiteral() != "5" {
+		t.Fatalf("il.TokenLiteral should have been 5, instead got %s", il.TokenLiteral())
+	}
 }
