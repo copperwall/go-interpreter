@@ -158,7 +158,9 @@ func (pe *InfixExpression) String() string {
 
 	out.WriteString("(")
 	out.WriteString(pe.Left.String())
+	out.WriteString(" ")
 	out.WriteString(pe.Operator)
+	out.WriteString(" ")
 	out.WriteString(pe.Right.String())
 	out.WriteString(")")
 
