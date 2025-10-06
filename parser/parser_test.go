@@ -359,7 +359,6 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		},
 	}
 
-	// NOTE: Failing due to whitespace, figure that out next time.
 	for _, tt := range tests {
 		l := lexer.New(tt.input)
 		p := New(l)
