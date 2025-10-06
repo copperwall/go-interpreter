@@ -181,12 +181,48 @@ func TestIntegerExpression(t *testing.T) {
 	}
 }
 
+func TestBooleanExpression(t *testing.T) {
+	input := "true"
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements length should be 1, got %d instead", len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+
+	// It should be parsed as an ExpressionStatment
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatment, got %T", program.Statements[0])
+	}
+
+	// The expression of the statement should be a Boolean (as opposed to some other value)
+	ident, ok := stmt.Expression.(*ast.Boolean)
+
+	if !ok {
+		t.Fatalf("stmt is not ast.Identifier, got %T", stmt.Expression)
+	}
+
+	if ident.Value != true {
+		t.Errorf("ident.Value not %s. got %t", "foobar", ident.Value)
+	}
+
+	if ident.TokenLiteral() != "true" {
+		t.Errorf("ident.TokenLiteral not %s, got %s", "foobar", ident.TokenLiteral())
+	}
+}
+
 func TestParsingPrefixExpressions(t *testing.T) {
 	prefixTests := []struct {
-		input        string
-		operator     string
-		integerValue int64
+		input    string
+		operator string
+		value    interface{}
 	}{
+		{"!true", "!", true},
+		{"!false", "!", false},
 		{"!5;", "!", 5},
 		{"-15;", "-", 15},
 		// NOTE: May have to take this out later, might conflict with infix
@@ -222,7 +258,7 @@ func TestParsingPrefixExpressions(t *testing.T) {
 			t.Fatalf("Expected expression to be PrefixExpression, got %T", stmt.Expression)
 		}
 
-		if !testIntegerLiteral(t, expression.Right, tt.integerValue) {
+		if !testLiteralExpression(t, expression.Right, tt.value) {
 			return
 		}
 	}
@@ -252,10 +288,13 @@ func testIntegerLiteral(t *testing.T, il ast.Expression, value int64) bool {
 func TestParsingInfixExpressions(t *testing.T) {
 	infixTests := []struct {
 		input      string
-		leftValue  int64
+		leftValue  interface{}
 		operator   string
-		rightValue int64
+		rightValue interface{}
 	}{
+		{"true == true;", true, "==", true},
+		{"true != false;", true, "!=", false},
+		{"false == false;", false, "==", false},
 		{"5 + 5;", 5, "+", 5},
 		{"5 - 5;", 5, "-", 5},
 		{"5 * 5;", 5, "*", 5},
@@ -278,31 +317,13 @@ func TestParsingInfixExpressions(t *testing.T) {
 		}
 
 		// Should be an expression statement
-		statement, ok := program.Statements[0].(*ast.ExpressionStatement)
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 
 		if !ok {
 			t.Fatalf("Statment should be expression statement, got %T", program.Statements[0])
 		}
 
-		// Expression should be InfixExpression
-		infixExpr, ok := statement.Expression.(*ast.InfixExpression)
-
-		if !ok {
-			t.Fatalf("Expression should be infix expression, got %T", statement.Expression)
-		}
-
-		// Left side value should be leftValue
-		if !testIntegerLiteral(t, infixExpr.Left, tt.leftValue) {
-			return
-		}
-
-		// Operator should be operator
-		if infixExpr.Operator != tt.operator {
-			t.Fatalf("Expected infix operator to be %s, got %s", infixExpr.Operator, tt.operator)
-		}
-
-		// Right side value should be rightValue
-		if !testIntegerLiteral(t, infixExpr.Right, tt.leftValue) {
+		if !testInfixExpression(t, stmt.Expression, tt.leftValue, tt.operator, tt.rightValue) {
 			return
 		}
 	}
@@ -313,6 +334,22 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		input    string
 		expected string
 	}{
+		{
+			"true",
+			"true",
+		},
+		{
+			"false",
+			"false",
+		},
+		{
+			"3 > 5 == false",
+			"((3 > 5) == false)",
+		},
+		{
+			"3 < 5 == true",
+			"((3 < 5) == true)",
+		},
 		{
 			"-a * b",
 			"((-a) * b)",
@@ -403,8 +440,30 @@ func testLiteralExpression(t *testing.T, exp ast.Expression, expected interface{
 		return testIntegerLiteral(t, exp, v)
 	case string:
 		return testIdentifier(t, exp, v)
+	case bool:
+		return testBooleanLiteral(t, exp, v)
 	}
 	return false
+}
+
+func testBooleanLiteral(t *testing.T, exp ast.Expression, value bool) bool {
+	bo, ok := exp.(*ast.Boolean)
+
+	if !ok {
+		t.Errorf("exp not *ast.Boolean, got %T", exp)
+		return false
+	}
+
+	if bo.Value != value {
+		t.Errorf("bo.Value not %t, got %t", bo.Value, value)
+		return false
+	}
+	if bo.TokenLiteral() != fmt.Sprintf("%t", value) {
+		t.Errorf("bo.TokenLiteral not %t, got %s", value, bo.TokenLiteral())
+		return false
+	}
+
+	return true
 }
 
 // interface{} here is for cases where we don't know what the type is
