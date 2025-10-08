@@ -61,6 +61,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.PLUS, p.parsePrefixExpression)
 	p.registerPrefix(token.TRUE, p.parseBoolean)
 	p.registerPrefix(token.FALSE, p.parseBoolean)
+	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
+	p.registerPrefix(token.IF, p.parseIfExpression)
 
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
@@ -73,6 +75,82 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.GT, p.parseInfixExpression)
 
 	return p
+}
+
+func (p *Parser) parseGroupedExpression() ast.Expression {
+	p.nextToken()
+
+	exp := p.parseExpression(LOWEST)
+
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	return exp
+}
+
+func (p *Parser) parseIfExpression() ast.Expression {
+	fmt.Println("In parse if")
+	ifExpr := &ast.IfExpression{
+		Token: p.curToken,
+	}
+
+	// Check for "("
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// consume "("
+	p.nextToken()
+	ifExpr.Condition = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	ifExpr.Consequence = p.parseBlockStatement()
+
+	// If there's an else, add alternative
+	// This assumes that parseBlockStatement reads in the last }, which feels like it should
+	if p.peekTokenIs(token.ELSE) {
+		p.nextToken()
+
+		if !p.expectPeek(token.LBRACE) {
+			return nil
+		}
+
+		ifExpr.Alternative = p.parseBlockStatement()
+	}
+
+	return ifExpr
+}
+
+func (p *Parser) parseBlockStatement() *ast.BlockStatement {
+	fmt.Println("In parse block")
+	block := &ast.BlockStatement{
+		Token: p.curToken,
+	}
+
+	block.Statements = []ast.Statement{}
+
+	// Consume {
+	p.nextToken()
+
+	// Until we get EOF or RBRACE, parse statements
+	for !p.curTokenIs(token.RBRACE) && !p.curTokenIs(token.EOF) {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
+
+		p.nextToken()
+	}
+
+	return block
 }
 
 func (p *Parser) peekPrecedence() int {
