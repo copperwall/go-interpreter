@@ -536,6 +536,94 @@ func TestIfElseExpression(t *testing.T) {
 	}
 }
 
+func TestFunctionLiteralParsing(t *testing.T) {
+	input := `fn(x, y) { x + y; }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements should be length 1, instead got %d", len(program.Statements))
+	}
+
+	// Cast first statement to Expression statement
+	//
+
+	// cast es to function literal
+	//
+	// assert list of parameters
+	//
+	// assert parameters are each the correct identifier using testLiteralExpression
+	// Assert that body has one statment
+	//
+	// assert that it's an expression statement
+	// assert that it's an infix expression using testInfixExpression like 'x + y'
+
+	es, ok := program.Statements[0].(*ast.ExpressionStatement)
+
+	if !ok {
+		t.Fatalf("Expected first statement to be expression statement, got %T", program.Statements[0])
+	}
+
+	fl, ok := es.Expression.(*ast.FunctionLiteral)
+
+	if !ok {
+		t.Fatalf("Expected expression to be function literal, got %T", es.Expression)
+	}
+
+	if len(fl.Parameters) != 2 {
+		t.Fatalf("Expected function to have two parameters, got %d", len(fl.Parameters))
+	}
+
+	testLiteralExpression(t, fl.Parameters[0], 'x')
+	testLiteralExpression(t, fl.Parameters[1], 'y')
+
+	if len(fl.Body.Statements) != 1 {
+		t.Fatalf("Function body should have 1 statment, instead got %d", len(fl.Body.Statements))
+	}
+
+	bodyStmt, ok := fl.Body.Statements[0].(*ast.ExpressionStatement)
+
+	if !ok {
+		t.Fatalf("Expected first statement to be expression statement, got %T", fl.Body.Statements[0])
+	}
+
+	testInfixExpression(t, bodyStmt.Expression, "x", "+", "y")
+
+}
+
+func TestFunctionParameterParsing(t *testing.T) {
+	tests := []struct {
+		input          string
+		expectedParams []string
+	}{
+		{input: "fn() {};", expectedParams: []string{}},
+		{input: "fn(x) {};", expectedParams: []string{"x"}},
+		{input: "fn(x, y, z) {};", expectedParams: []string{"x", "y", "z"}},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
+
+		stmt := program.Statements[0].(*ast.ExpressionStatement)
+		function := stmt.Expression.(*ast.FunctionLiteral)
+
+		if len(function.Parameters) != len(tt.expectedParams) {
+			t.Errorf("length parameters wrong. want %d, got=%d\n",
+				len(tt.expectedParams), len(function.Parameters))
+		}
+
+		for i, ident := range tt.expectedParams {
+			testLiteralExpression(t, function.Parameters[i], ident)
+		}
+	}
+}
+
 func testIdentifier(t *testing.T, exp ast.Expression, value string) bool {
 	// Cast expression which can be false okay
 	ident, ok := exp.(*ast.Identifier)
