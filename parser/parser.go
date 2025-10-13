@@ -28,6 +28,7 @@ var precedences = map[token.TokenType]int{
 	token.MINUS:    SUM,
 	token.SLASH:    PRODUCT,
 	token.ASTERISK: PRODUCT,
+	token.LPAREN:   CALL,
 }
 
 type Parser struct {
@@ -74,6 +75,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
 	p.registerInfix(token.LT, p.parseInfixExpression)
 	p.registerInfix(token.GT, p.parseInfixExpression)
+	p.registerInfix(token.LPAREN, p.parseCallExpression)
 
 	return p
 }
@@ -136,6 +138,47 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 	}
 
 	return identifiers
+}
+
+func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
+	// in this case the function expression is the `function` argument
+	// This can be a function expression or an identifier expression
+
+	expr := &ast.CallExpression{Token: p.curToken, Function: function}
+
+	expr.Arguments = p.parseCallArguments()
+	return expr
+}
+
+func (p *Parser) parseCallArguments() []ast.Expression {
+	// After this need to parse out arguments
+	// no arg case
+	// multi arg case, args are expressions
+	args := []ast.Expression{}
+
+	if p.peekTokenIs(token.RPAREN) {
+		p.nextToken()
+		return args
+	}
+
+	p.nextToken()
+
+	args = append(args, p.parseExpression(LOWEST))
+
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken()
+		p.nextToken()
+
+		args = append(args, p.parseExpression(LOWEST))
+	}
+
+	// If we parse an expression and there are no more commas, we expect the next token to
+	// be a right paren, otherwise it's a syntax error
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	return args
 }
 
 func (p *Parser) parseIfExpression() ast.Expression {
@@ -303,6 +346,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 	for p.curToken.Type != token.EOF {
 		stmt := p.parseStatement()
+		fmt.Println(stmt.String())
 		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
 		}
@@ -324,21 +368,25 @@ func (p *Parser) parseStatement() ast.Statement {
 }
 
 func (p *Parser) parseLetStatement() ast.Statement {
+	fmt.Println("In let statement")
 	stmt := &ast.LetStatement{
 		Token: p.curToken,
 	}
 
+	fmt.Println(p.curToken.Literal)
 	if !p.expectPeek(token.IDENT) {
 		return nil
 	}
 
+	fmt.Println(p.curToken.Literal)
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	if !p.expectPeek(token.ASSIGN) {
 		return nil
 	}
 
-	// NOTE: Currently skipping all expressions until we see a semicolon;
+	stmt.Value = p.parseExpression(LOWEST)
+
 	for !p.curTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
@@ -351,7 +399,8 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 
 	p.nextToken()
 
-	// TODO: Skip all expressions until done
+	stmt.ReturnValue = p.parseExpression(LOWEST)
+
 	for !p.curTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
