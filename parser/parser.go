@@ -182,7 +182,6 @@ func (p *Parser) parseCallArguments() []ast.Expression {
 }
 
 func (p *Parser) parseIfExpression() ast.Expression {
-	fmt.Println("In parse if")
 	ifExpr := &ast.IfExpression{
 		Token: p.curToken,
 	}
@@ -222,7 +221,6 @@ func (p *Parser) parseIfExpression() ast.Expression {
 }
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
-	fmt.Println("In parse block")
 	block := &ast.BlockStatement{
 		Token: p.curToken,
 	}
@@ -346,7 +344,6 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 	for p.curToken.Type != token.EOF {
 		stmt := p.parseStatement()
-		fmt.Println(stmt.String())
 		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
 		}
@@ -368,26 +365,25 @@ func (p *Parser) parseStatement() ast.Statement {
 }
 
 func (p *Parser) parseLetStatement() ast.Statement {
-	fmt.Println("In let statement")
 	stmt := &ast.LetStatement{
 		Token: p.curToken,
 	}
 
-	fmt.Println(p.curToken.Literal)
 	if !p.expectPeek(token.IDENT) {
 		return nil
 	}
 
-	fmt.Println(p.curToken.Literal)
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	if !p.expectPeek(token.ASSIGN) {
 		return nil
 	}
 
+	p.nextToken()
+
 	stmt.Value = p.parseExpression(LOWEST)
 
-	for !p.curTokenIs(token.SEMICOLON) {
+	for p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 
@@ -401,7 +397,7 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 
 	stmt.ReturnValue = p.parseExpression(LOWEST)
 
-	for !p.curTokenIs(token.SEMICOLON) {
+	for p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 
