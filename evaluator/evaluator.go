@@ -38,7 +38,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			return elements[0]
 		}
 
-		return &object.ArrayLiteral{Elements: elements}
+		return &object.Array{Elements: elements}
 	case *ast.FunctionLiteral:
 		params := node.Parameters
 		body := node.Body
