@@ -394,6 +394,68 @@ func TestArrayLiterals(t *testing.T) {
 	testBooleanObject(t, array.Elements[2], true)
 }
 
+func TestArrayIndexExpressions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{
+			"[1,2,3][0]",
+			1,
+		},
+		{
+			"[1,2,3][1]",
+			2,
+		},
+		{
+			"[1,2,3][2]",
+			3,
+		},
+		{
+			"[1,2,3][1 + 1]",
+			3,
+		},
+		{
+			"let x = [1,2,3]; x[2]",
+			3,
+		},
+		{
+			"let x = [1,2,3]; x[0] + x[1] + x[2];",
+			6,
+		},
+		{
+			"let i = 0; [1][i]",
+			1,
+		},
+		{
+			// Invalid access over
+			"[1,2,3][3]",
+			nil,
+		},
+		{
+			// Invalid access under
+			"[1,2,3][-1]",
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+
+		integer, ok := tt.expected.(int)
+
+		if ok {
+			// Check for integer value
+			testIntegerObject(t, evaluated, int64(integer))
+		} else {
+			// check for nil
+			if evaluated != NULL {
+				testNullObject(t, evaluated)
+			}
+		}
+	}
+}
+
 func testNullObject(t *testing.T, evaluated object.Object) bool {
 	if evaluated != NULL {
 		t.Errorf("object is not NULL. Got %T (%+v)", evaluated, evaluated)
