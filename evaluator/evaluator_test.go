@@ -374,6 +374,26 @@ func TestBuiltinFunctions(t *testing.T) {
 	}
 }
 
+func TestArrayLiterals(t *testing.T) {
+	input := "[1 + 2, 10, true]"
+
+	evaluated := testEval(input)
+
+	array, ok := evaluated.(*object.Array)
+
+	if !ok {
+		t.Fatalf("Expected array object, got %T (%+v)", evaluated, evaluated)
+	}
+
+	if len(array.Elements) != 3 {
+		t.Fatalf("Expected three elements, got %d", len(array.Elements))
+	}
+
+	testIntegerObject(t, array.Elements[0], 3)
+	testIntegerObject(t, array.Elements[1], 10)
+	testBooleanObject(t, array.Elements[2], true)
+}
+
 func testNullObject(t *testing.T, evaluated object.Object) bool {
 	if evaluated != NULL {
 		t.Errorf("object is not NULL. Got %T (%+v)", evaluated, evaluated)
