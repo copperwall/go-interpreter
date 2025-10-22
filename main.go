@@ -3,11 +3,22 @@ package main
 import (
 	"fmt"
 	"monkey/repl"
+	"monkey/run"
 	"os"
 	"os/user"
 )
 
 func main() {
+	args := os.Args[1:]
+
+	if len(args) == 0 {
+		replMode()
+	} else {
+		run.RunProgramFromFile(args[0])
+	}
+}
+
+func replMode() {
 	user, err := user.Current()
 
 	if err != nil {
