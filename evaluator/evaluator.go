@@ -29,6 +29,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			return right
 		}
 		return evalPrefixExpression(node.Operator, right)
+	case *ast.HashLiteral:
+		return evalHashLiteral(node, env)
 	case *ast.IndexExpression:
 		// Eval left hand,
 		// if it's not an array do an error
@@ -370,6 +372,34 @@ func evalArrayIndexExpression(array object.Object, index object.Object) object.O
 	}
 
 	return arrayObj.Elements[idx]
+}
+
+func evalHashLiteral(hashLiteral *ast.HashLiteral, env *object.Environment) object.Object {
+	pairs := make(map[object.HashKey]object.HashPair)
+
+	for keyNode, valueNode := range hashLiteral.Pairs {
+		key := Eval(keyNode, env)
+		if isError(key) {
+			return key
+		}
+
+		hashKey, ok := key.(object.Hashable)
+
+		if !ok {
+			return newError("Key must be a hashable type. Expected String, boolean, integer, got %s", key.Type())
+		}
+
+		value := Eval(valueNode, env)
+		if isError(value) {
+			return value
+		}
+
+		pairs[hashKey.HashKey()] = object.HashPair{Key: key, Value: value}
+	}
+
+	return &object.Hash{
+		Pairs: pairs,
+	}
 }
 
 func isTruthy(obj object.Object) bool {
