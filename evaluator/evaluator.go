@@ -355,10 +355,30 @@ func evalIndexExpression(left object.Object, index object.Object) object.Object 
 	switch {
 	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INTEGER_OBJ:
 		return evalArrayIndexExpression(left, index)
+	case left.Type() == object.HASH_OBJ:
+		return evalHashIndexExpression(left, index)
 	default:
 		return newError("index operator not supported: %s", left.Type())
 
 	}
+}
+
+func evalHashIndexExpression(hashObj object.Object, index object.Object) object.Object {
+	// index must be hashable
+	hashKey, ok := index.(object.Hashable)
+	if !ok {
+		return newError("unusable as hash key: %s", index.Type())
+	}
+
+	// Caller checked type
+	hashObject := hashObj.(*object.Hash)
+	pair, ok := hashObject.Pairs[hashKey.HashKey()]
+
+	if !ok {
+		return NULL
+	}
+
+	return pair.Value
 }
 
 func evalArrayIndexExpression(array object.Object, index object.Object) object.Object {

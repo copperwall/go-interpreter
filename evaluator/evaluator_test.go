@@ -198,6 +198,10 @@ func TestErrorHandling(t *testing.T) {
 		// Evaluate unknown identifier
 		{"a;", "identifier not found: \"a\""},
 		{`"Hello" - "World"`, "unknown operator: STRING - STRING"},
+		{
+			`{"name": "test"}[fn(x) { x }]`,
+			"unusable as hash key: FUNCTION",
+		},
 	}
 
 	for _, tt := range tests {
@@ -452,6 +456,57 @@ func TestArrayIndexExpressions(t *testing.T) {
 			if evaluated != NULL {
 				testNullObject(t, evaluated)
 			}
+		}
+	}
+}
+
+func TestHashIndexExpressions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{
+			`{"foo": 5}["foo"]`,
+			5,
+		},
+		{
+			`{"foo": 5}["bar"]`,
+			nil,
+		},
+		{
+			`let key = "foo"; {"foo": 5}[key]`,
+			5,
+		},
+		{
+			`{}["foo"]`,
+			nil,
+		},
+		{
+			`{5: 5}[5]`,
+			5,
+		},
+		{
+			`{true: 5}[true]`,
+			5,
+		},
+		{
+			`{false: 5}[false]`,
+			5,
+		},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+
+		integer, ok := tt.expected.(int)
+
+		if ok {
+			// int test case
+			testIntegerObject(t, evaluated, int64(integer))
+		} else {
+			// null test case
+			testNullObject(t, evaluated)
+
 		}
 	}
 }
