@@ -70,7 +70,7 @@ var builtins = map[string]*object.Builtin{
 				return NULL
 			}
 
-			newElements := make([]object.Object, length-1, length-1)
+			newElements := make([]object.Object, length-1)
 			copy(newElements, arr.Elements[1:length])
 			return &object.Array{Elements: newElements}
 		},
