@@ -19,7 +19,7 @@ func parse(input string) *ast.Program {
 
 type compilerTestCase struct {
 	input                string
-	expectedConstants    []interface{}
+	expectedConstants    []any
 	expectedInstructions []code.Instructions
 }
 
@@ -42,6 +42,7 @@ func testInstructions(
 	return nil
 }
 
+// flattens a list of instructions into a single code.Instructions
 func concatInstructions(instructions []code.Instructions) code.Instructions {
 	out := code.Instructions{}
 
@@ -89,7 +90,7 @@ func TestIntegerArithmetic(t *testing.T) {
 	tests := []compilerTestCase{
 		{
 			input:             "1 + 2",
-			expectedConstants: []interface{}{1, 2},
+			expectedConstants: []any{1, 2},
 			expectedInstructions: []code.Instructions{
 				code.Make(code.OpConstant, 0),
 				code.Make(code.OpConstant, 1),
