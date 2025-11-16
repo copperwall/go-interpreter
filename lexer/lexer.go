@@ -81,7 +81,10 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.RBRACKET, ']')
 	case '"':
 		tok.Type = token.STRING
-		tok.Literal = l.readString()
+		tok.Literal = l.readString('"')
+	case '\'':
+		tok.Type = token.STRING
+		tok.Literal = l.readString('\'')
 	case 0:
 		tok.Literal = ""
 		tok.Type = token.EOF
@@ -131,14 +134,14 @@ func (l *Lexer) readNumber() string {
 	return l.input[position:l.position]
 }
 
-func (l *Lexer) readString() string {
+func (l *Lexer) readString(delimiter byte) string {
 	// Record start position of the string
 	position := l.position + 1
 
-	// Advance lexer until we get the next '"' or EOF
+	// Advance lexer until we get the next delimiter (' or ") or EOF
 	for {
 		l.readChar()
-		if l.ch == '"' || l.ch == 0 {
+		if l.ch == delimiter || l.ch == 0 {
 			break
 		}
 	}
