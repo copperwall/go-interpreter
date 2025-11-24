@@ -32,7 +32,7 @@ func testIntegerObject(expected int64, actual object.Object) error {
 
 type vmTestCase struct {
 	input    string
-	expected interface{}
+	expected any
 }
 
 func runVmTests(t *testing.T, tests []vmTestCase) {
@@ -55,14 +55,14 @@ func runVmTests(t *testing.T, tests []vmTestCase) {
 			t.Fatalf("vm error: %s", err)
 		}
 
-		stackElem := vm.StackTop()
+		stackElem := vm.LastPoppedStackElem()
 
 		// The top of the stack is the result of the computation
 		testExpectedObject(t, tt.expected, stackElem)
 	}
 }
 
-func testExpectedObject(t *testing.T, expected interface{}, actual object.Object) {
+func testExpectedObject(t *testing.T, expected any, actual object.Object) {
 	t.Helper()
 
 	switch expected := expected.(type) {
@@ -81,8 +81,18 @@ func TestIntegerArithmetic(t *testing.T) {
 	tests := []vmTestCase{
 		{"1", 1},
 		{"2", 2},
-		{"1 + 2", 2}, // FIX
+		{"1 + 2", 3},
+		{"1 - 2", -1},
+		{"1 * 2", 2},
+		{"1 * 2", 2},
+		{"4 / 2", 2},
+		{"50 / 2 * 2 + 10 - 5", 55},
+		{"5 + 5 + 5 + 5 - 10", 10},
+		{"5 * 2 + 10", 20},
+		{"5 + 2 * 10", 25},
+		{"5 * (2 + 10)", 60},
 	}
 
+	fmt.Println("What")
 	runVmTests(t, tests)
 }
