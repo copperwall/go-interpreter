@@ -126,7 +126,6 @@ func (vm *VM) executeBinaryIntegerOperation(op code.Opcode, left, right object.O
 		return fmt.Errorf("unknown integer operator: %d", op)
 	}
 
-	fmt.Printf("Binary operation: %d %d %d, %d\n", leftValue, op, rightValue, result)
 	return vm.push(&object.Integer{Value: result})
 }
 
