@@ -70,6 +70,11 @@ func (vm *VM) Run() error {
 			if err != nil {
 				return err
 			}
+		case code.OpEqual, code.OpNotEqual, code.OpGreaterThan:
+			err := vm.executeComparison(op)
+			if err != nil {
+				return err
+			}
 		case code.OpTrue:
 			err := vm.push(True)
 			if err != nil {
@@ -125,6 +130,42 @@ func (vm *VM) executeBinaryIntegerOperation(op code.Opcode, left, right object.O
 	return vm.push(&object.Integer{Value: result})
 }
 
+func (vm *VM) executeComparison(op code.Opcode) error {
+	right := vm.pop()
+	left := vm.pop()
+
+	if right.Type() == object.INTEGER_OBJ && left.Type() == object.INTEGER_OBJ {
+		return vm.executeIntegerComparison(op, left, right)
+	}
+
+	// If right and left are integers, do eq, noteq, gt
+	switch op {
+	case code.OpEqual:
+		// We don't need to unwrap these because booleans are singleton values.
+		return vm.push(nativeBoolToBooleanObject(right == left))
+	case code.OpNotEqual:
+		return vm.push(nativeBoolToBooleanObject(right != left))
+	default:
+		return fmt.Errorf("Unsupported operator: %d (%s %s)", op, left.Type(), right.Type())
+	}
+}
+
+func (vm *VM) executeIntegerComparison(op code.Opcode, left, right object.Object) error {
+	leftValue := left.(*object.Integer).Value
+	rightValue := right.(*object.Integer).Value
+
+	switch op {
+	case code.OpEqual:
+		return vm.push(nativeBoolToBooleanObject(leftValue == rightValue))
+	case code.OpNotEqual:
+		return vm.push(nativeBoolToBooleanObject(leftValue != rightValue))
+	case code.OpGreaterThan:
+		return vm.push(nativeBoolToBooleanObject(leftValue > rightValue))
+	default:
+		return fmt.Errorf("Unknown operator: %d", op)
+	}
+}
+
 func (vm *VM) LastPoppedStackElem() object.Object {
 	return vm.stack[vm.sp]
 }
@@ -145,4 +186,12 @@ func (vm *VM) pop() object.Object {
 	o := vm.stack[vm.sp-1]
 	vm.sp--
 	return o
+}
+
+func nativeBoolToBooleanObject(input bool) *object.Boolean {
+	if input {
+		return True
+	}
+
+	return False
 }
