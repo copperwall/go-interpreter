@@ -85,6 +85,17 @@ func (vm *VM) Run() error {
 			if err != nil {
 				return err
 			}
+		case code.OpBang:
+			err := vm.executeBangOperation()
+
+			if err != nil {
+				return err
+			}
+		case code.OpMinus:
+			err := vm.executeMinusOperation()
+			if err != nil {
+				return err
+			}
 
 		case code.OpPop:
 			vm.pop()
@@ -106,6 +117,27 @@ func (vm *VM) executeBinaryOperation(op code.Opcode) error {
 	}
 
 	return fmt.Errorf("Unsupported types for binary operation: %s %s", leftType, rightType)
+}
+
+// Everything not False is True with ! (i.e. !5 is False, !true is False)
+func (vm *VM) executeBangOperation() error {
+	right := vm.pop()
+	if right == False {
+		return vm.push(True)
+	}
+
+	return vm.push(False)
+}
+
+func (vm *VM) executeMinusOperation() error {
+	right := vm.pop()
+	if right.Type() != object.INTEGER_OBJ {
+		return fmt.Errorf("Minus operator only works on integers, got %s", right.Type())
+	}
+
+	value := right.(*object.Integer).Value
+
+	return vm.push(&object.Integer{Value: -value})
 }
 
 func (vm *VM) executeBinaryIntegerOperation(op code.Opcode, left, right object.Object) error {
