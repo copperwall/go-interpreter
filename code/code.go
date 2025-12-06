@@ -29,6 +29,8 @@ const (
 	OpBang
 	OpJumpNotTruthy
 	OpJump
+
+	OpNull
 )
 
 type Definition struct {
@@ -44,7 +46,7 @@ var definitions = map[Opcode]*Definition{
 	OpMul:      {"OpMul", []int{}},
 	OpDiv:      {"OpDiv", []int{}},
 	OpTrue:     {"OpTrue", []int{}},
-	OpFalse:    {"OpTrue", []int{}},
+	OpFalse:    {"OpFalse", []int{}},
 	OpEqual:    {"OpEqual", []int{}},
 	OpNotEqual: {"OpNotEqual", []int{}},
 	// Less than is generated via compiler, not as an opcode
@@ -55,6 +57,8 @@ var definitions = map[Opcode]*Definition{
 	// Jumps
 	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}},
 	OpJump:          {"OpJump", []int{2}},
+
+	OpNull: {"OpNull", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {

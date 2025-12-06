@@ -131,16 +131,15 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.removeLastPop()
 		}
 
+		jumpPos := c.emit(code.OpJump, 9999)
+		// Update JMPNotTruthy to point to end of consequence instructions
+		endOfConsequencePos := len(c.instructions)
+		c.changeOperand(jumpNotTruthPos, endOfConsequencePos)
 		if node.Alternative == nil {
-			// Update JMPNotTruthy to point to end of consequence instructions
-			endOfConsequencePos := len(c.instructions)
-			c.changeOperand(jumpNotTruthPos, endOfConsequencePos)
+			c.emit(code.OpNull)
 
 		} else {
-			jumpPos := c.emit(code.OpJump, 9999)
 			// Update JMPNotTruthy to point to end of consequence instructions (after OpJump after consequence)
-			endOfConsequencePos := len(c.instructions)
-			c.changeOperand(jumpNotTruthPos, endOfConsequencePos)
 			err := c.Compile(node.Alternative)
 
 			if err != nil {
@@ -152,9 +151,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 			if c.lastInstructionIsPop() {
 				c.removeLastPop()
 			}
-			endOfAlternativePos := len(c.instructions)
-			c.changeOperand(jumpPos, endOfAlternativePos)
 		}
+		endOfAlternativePos := len(c.instructions)
+		c.changeOperand(jumpPos, endOfAlternativePos)
 
 		// If no alternative don't add a non-conditional jump
 	case *ast.BlockStatement:

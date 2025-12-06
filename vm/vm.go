@@ -16,6 +16,7 @@ var True = &object.Boolean{
 var False = &object.Boolean{
 	Value: false,
 }
+var Null = &object.Null{}
 
 type VM struct {
 	constants    []object.Object
@@ -108,6 +109,11 @@ func (vm *VM) Run() error {
 			if !isTruthy(condition) {
 				ip = pos - 1
 			}
+		case code.OpNull:
+			err := vm.push(Null)
+			if err != nil {
+				return err
+			}
 		case code.OpPop:
 			vm.pop()
 		}
@@ -133,7 +139,7 @@ func (vm *VM) executeBinaryOperation(op code.Opcode) error {
 // Everything not False is True with ! (i.e. !5 is False, !true is False)
 func (vm *VM) executeBangOperation() error {
 	right := vm.pop()
-	if right == False {
+	if right == False || right == Null {
 		return vm.push(True)
 	}
 
@@ -242,6 +248,8 @@ func isTruthy(obj object.Object) bool {
 	switch obj := obj.(type) {
 	case *object.Boolean:
 		return obj.Value
+	case *object.Null:
+		return false
 	default:
 		return true
 	}
