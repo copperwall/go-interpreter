@@ -165,6 +165,9 @@ func (vm *VM) Run() error {
 			pairs := make(map[object.HashKey]object.HashPair)
 
 			// size is amount of pops to do, not pairs
+			// This means that printing a hash in the runtime will
+			// show the pairs in a different order, but they don't support
+			// iteration so it doesn't matter right now
 			for i := uint16(0); i < size; i += 2 {
 				val := vm.pop()
 				key := vm.pop()
