@@ -110,6 +110,23 @@ func testExpectedObject(t *testing.T, expected any, actual object.Object) {
 		if actual != Null {
 			t.Errorf("Expected null, got %T (%+v)", actual, actual)
 		}
+	case []int:
+		array, ok := actual.(*object.Array)
+
+		if !ok {
+			t.Errorf("Expected value to be object.Array, got %T (%+v)", actual, actual)
+		}
+
+		if len(expected) != len(array.Elements) {
+			t.Errorf("Expected %d elements, got %d", len(expected), len(array.Elements))
+		}
+
+		for i, expectedEl := range expected {
+			err := testIntegerObject(int64(expectedEl), array.Elements[i])
+			if err != nil {
+				t.Errorf("testIntegerObject failed: %s", err)
+			}
+		}
 	case string:
 		err := testStringObject(expected, actual)
 
@@ -217,4 +234,16 @@ func TestStringExpressions(t *testing.T) {
 	}
 
 	runVmTests(t, tests)
+}
+
+func TestArrayExpressions(t *testing.T) {
+	tests := []vmTestCase{
+		{"[]", []int{}},
+		{"[1,2,3]", []int{1, 2, 3}},
+		{"[1 + 2, 3 - 4, 5 * 6]", []int{3, -1, 30}},
+		{"[]", []int{}},
+	}
+
+	runVmTests(t, tests)
+
 }

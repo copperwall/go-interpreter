@@ -139,6 +139,25 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpArray:
+			size := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
+			arr := make([]object.Object, size)
+
+			// These are gonna be right to left
+			// Slightly different impl than book, but tests pass
+			// Starting from size so that we don't have to change
+			// size from uint16 to get to < 0.
+			for i := size; i > 0; i-- {
+				arr[i-1] = vm.pop()
+			}
+
+			arrObj := &object.Array{Elements: arr}
+			err := vm.push(arrObj)
+			if err != nil {
+				return err
+			}
+
 		case code.OpPop:
 			vm.pop()
 		}
