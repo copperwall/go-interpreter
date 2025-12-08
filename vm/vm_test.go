@@ -39,6 +39,7 @@ func runVmTests(t *testing.T, tests []vmTestCase) {
 	t.Helper()
 
 	for _, tt := range tests {
+		fmt.Println(tt.input)
 		program := parse(tt.input)
 		comp := compiler.New()
 
@@ -76,6 +77,20 @@ func testBooleanObject(expected bool, actual object.Object) error {
 	return nil
 }
 
+func testStringObject(expected string, actual object.Object) error {
+	result, ok := actual.(*object.String)
+
+	if !ok {
+		return fmt.Errorf("object is not string, got %T (%+v)", actual, actual)
+	}
+
+	if result.Value != expected {
+		return fmt.Errorf("Expected %q, but got %q", expected, result.Value)
+	}
+
+	return nil
+}
+
 func testExpectedObject(t *testing.T, expected any, actual object.Object) {
 	t.Helper()
 
@@ -94,6 +109,12 @@ func testExpectedObject(t *testing.T, expected any, actual object.Object) {
 	case *object.Null:
 		if actual != Null {
 			t.Errorf("Expected null, got %T (%+v)", actual, actual)
+		}
+	case string:
+		err := testStringObject(expected, actual)
+
+		if err != nil {
+			t.Errorf("testStringObject failed: %s", err)
 		}
 	}
 }
@@ -166,6 +187,33 @@ func TestConditionals(t *testing.T) {
 		{"if (1 < 2) { 10 } else { 20 }", 10},
 		{"if (1 > 2) { 10 } else { 20 }", 20},
 		{"if (if (1 > 2) { 10 }) { 20 } else { 30 }", 30},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestGlobalLetStatements(t *testing.T) {
+	tests := []vmTestCase{
+		{"let one = 1; one", 1},
+		{"let one = 1; let two = 2; one + two", 3},
+		{"let one = 1; let two = one + one; one + two", 3},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestStringExpressions(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			`"hello"`, "hello",
+		},
+		{
+
+			`let h = "word"; h`, "word",
+		},
+		{
+			`let thing = "hello" + " world"`, "hello world",
+		},
 	}
 
 	runVmTests(t, tests)

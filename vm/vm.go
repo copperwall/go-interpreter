@@ -8,6 +8,7 @@ import (
 )
 
 const StackSize = 2048
+const GlobalsSize = 65536
 
 // Global boolean objects
 var True = &object.Boolean{
@@ -23,6 +24,7 @@ type VM struct {
 	instructions code.Instructions
 	stack        []object.Object
 	sp           int // This points to the next value, the top value in the stack is always at sp - 1.
+	globals      []object.Object
 }
 
 func New(bytecode *compiler.Bytecode) *VM {
@@ -30,9 +32,16 @@ func New(bytecode *compiler.Bytecode) *VM {
 		instructions: bytecode.Instructions,
 		constants:    bytecode.Constants,
 
-		stack: make([]object.Object, StackSize),
-		sp:    0,
+		stack:   make([]object.Object, StackSize),
+		sp:      0,
+		globals: make([]object.Object, GlobalsSize),
 	}
+}
+
+func NewWithGlobalsStore(bytecode *compiler.Bytecode, s []object.Object) *VM {
+	vm := New(bytecode)
+	vm.globals = s
+	return vm
 }
 
 func (vm *VM) StackTop() object.Object {
@@ -114,6 +123,22 @@ func (vm *VM) Run() error {
 			if err != nil {
 				return err
 			}
+		case code.OpSetGlobal:
+			index := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
+
+			vm.globals[index] = vm.pop()
+
+		case code.OpGetGlobal:
+			// Read index off of instruction
+			index := int(code.ReadUint16(vm.instructions[ip+1:]))
+
+			ip += 2
+			err := vm.push(vm.globals[index])
+			if err != nil {
+				return err
+			}
+
 		case code.OpPop:
 			vm.pop()
 		}
@@ -129,11 +154,15 @@ func (vm *VM) executeBinaryOperation(op code.Opcode) error {
 	leftType := left.Type()
 	rightType := right.Type()
 
-	if leftType == object.INTEGER_OBJ && rightType == object.INTEGER_OBJ {
+	switch {
+	case leftType == object.INTEGER_OBJ && rightType == object.INTEGER_OBJ:
 		return vm.executeBinaryIntegerOperation(op, left, right)
+	case leftType == object.STRING_OBJ && rightType == object.STRING_OBJ:
+		return vm.executeBinaryStringOperation(op, left, right)
+	default:
+		return fmt.Errorf("Unsupported types for binary operation: %s %s", leftType, rightType)
 	}
 
-	return fmt.Errorf("Unsupported types for binary operation: %s %s", leftType, rightType)
 }
 
 // Everything not False is True with ! (i.e. !5 is False, !true is False)
@@ -176,6 +205,19 @@ func (vm *VM) executeBinaryIntegerOperation(op code.Opcode, left, right object.O
 	}
 
 	return vm.push(&object.Integer{Value: result})
+}
+
+func (vm *VM) executeBinaryStringOperation(op code.Opcode, left object.Object, right object.Object) error {
+	if op != code.OpAdd {
+		return fmt.Errorf("unknown string operator: %d", op)
+	}
+
+	rightStr := right.(*object.String).Value
+	leftStr := left.(*object.String).Value
+
+	newStr := &object.String{Value: leftStr + rightStr}
+
+	return vm.push(newStr)
 }
 
 func (vm *VM) executeComparison(op code.Opcode) error {

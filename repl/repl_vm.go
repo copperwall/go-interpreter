@@ -6,12 +6,16 @@ import (
 	"io"
 	"monkey/compiler"
 	"monkey/lexer"
+	"monkey/object"
 	"monkey/parser"
 	"monkey/vm"
 )
 
 func StartVMRepl(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
+	constants := []object.Object{}
+	globals := make([]object.Object, vm.GlobalsSize)
+	symbolTable := compiler.NewSymbolTable()
 
 	for {
 		fmt.Fprintf(out, PROMPT)
@@ -34,7 +38,7 @@ func StartVMRepl(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		c := compiler.New()
+		c := compiler.NewWithState(symbolTable, constants)
 		err := c.Compile(program)
 
 		if err != nil {
@@ -42,7 +46,7 @@ func StartVMRepl(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		machine := vm.New(c.Bytecode())
+		machine := vm.NewWithGlobalsStore(c.Bytecode(), globals)
 		err = machine.Run()
 
 		if err != nil {
