@@ -158,9 +158,37 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpHash:
+			size := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
+
+			pairs := make(map[object.HashKey]object.HashPair)
+
+			// size is amount of pops to do, not pairs
+			for i := uint16(0); i < size; i += 2 {
+				val := vm.pop()
+				key := vm.pop()
+
+				pair := object.HashPair{Key: key, Value: val}
+
+				hashKey, ok := key.(object.Hashable)
+
+				if !ok {
+					return fmt.Errorf("Value not hashable as key: %s", key.Type())
+				}
+
+				pairs[hashKey.HashKey()] = pair
+			}
+
+			err := vm.push(&object.Hash{Pairs: pairs})
+
+			if err != nil {
+				return err
+			}
 		case code.OpPop:
 			vm.pop()
 		}
+
 	}
 
 	return nil

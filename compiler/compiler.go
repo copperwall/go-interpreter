@@ -5,6 +5,7 @@ import (
 	"monkey/ast"
 	"monkey/code"
 	"monkey/object"
+	"sort"
 )
 
 type EmittedInstruction struct {
@@ -134,6 +135,36 @@ func (c *Compiler) Compile(node ast.Node) error {
 			}
 		}
 		c.emit(code.OpArray, size)
+	case *ast.HashLiteral:
+		size := len(node.Pairs) * 2
+
+		keys := []ast.Expression{}
+
+		for k := range node.Pairs {
+			keys = append(keys, k)
+		}
+
+		sort.Slice(keys, func(i, j int) bool {
+			return keys[i].String() < keys[j].String()
+		})
+
+		// Don't use range, sort and range over keys
+		// Helpful for testing consistently, since go doesn't guarantee
+		// iteration order in maps
+		for _, k := range keys {
+			err := c.Compile(k)
+
+			if err != nil {
+				return err
+			}
+
+			err = c.Compile(node.Pairs[k])
+			if err != nil {
+				return err
+			}
+		}
+
+		c.emit(code.OpHash, size)
 	case *ast.PrefixExpression:
 		err := c.Compile(node.Right)
 
