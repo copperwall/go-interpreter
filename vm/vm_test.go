@@ -39,7 +39,6 @@ func runVmTests(t *testing.T, tests []vmTestCase) {
 	t.Helper()
 
 	for _, tt := range tests {
-		fmt.Println(tt.input)
 		program := parse(tt.input)
 		comp := compiler.New()
 
