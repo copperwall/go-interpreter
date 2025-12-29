@@ -10,6 +10,8 @@ import (
 const StackSize = 2048
 const GlobalsSize = 65536
 
+const MaxFrames = 1024
+
 // Global boolean objects
 var True = &object.Boolean{
 	Value: true,
@@ -20,21 +22,31 @@ var False = &object.Boolean{
 var Null = &object.Null{}
 
 type VM struct {
-	constants    []object.Object
-	instructions code.Instructions
-	stack        []object.Object
-	sp           int // This points to the next value, the top value in the stack is always at sp - 1.
-	globals      []object.Object
+	constants []object.Object
+	stack     []object.Object
+	sp        int // This points to the next value, the top value in the stack is always at sp - 1.
+	globals   []object.Object
+
+	frames      []*Frame
+	framesIndex int
 }
 
 func New(bytecode *compiler.Bytecode) *VM {
+	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
+	mainFrame := NewFrame(mainFn)
+
+	frames := make([]*Frame, MaxFrames)
+	frames[0] = mainFrame
+
 	return &VM{
-		instructions: bytecode.Instructions,
-		constants:    bytecode.Constants,
+		constants: bytecode.Constants,
 
 		stack:   make([]object.Object, StackSize),
 		sp:      0,
 		globals: make([]object.Object, GlobalsSize),
+
+		frames:      frames,
+		framesIndex: 1,
 	}
 }
 
@@ -53,21 +65,28 @@ func (vm *VM) StackTop() object.Object {
 }
 
 func (vm *VM) Run() error {
+	var ip int
+	var ins code.Instructions
+	var op code.Opcode
+
 	// ip is instruction pointer
 	// it starts at the beginning an goes until there are no instructions left.
 	// vm.instructions is a []byte, meaning we need to parse instructions correctly
 	// otherwise we'll end up at the beginning of a loop on a byte that isn't an opcode.
-	for ip := 0; ip < len(vm.instructions); ip++ {
-		// Fetch the instruction
-		op := code.Opcode(vm.instructions[ip])
+	for vm.currentFrame().ip < len(vm.currentFrame().Instructions())-1 {
+		vm.currentFrame().ip++
+
+		ip = vm.currentFrame().ip
+		ins = vm.currentFrame().Instructions()
+		op = code.Opcode(ins[ip])
 
 		// Decode the opcode
 		switch op {
 		case code.OpConstant:
 			// If it's a constant, read the next two bytes after the ip
-			constIndex := code.ReadUint16(vm.instructions[ip+1:])
+			constIndex := code.ReadUint16(ins[ip+1:])
 			// increment the ip past the two bytes we read
-			ip += 2
+			vm.currentFrame().ip += 2
 
 			// The operand in a OpConstant instruction is an index into the vm's constants table,
 			// not the constant value itself.
@@ -108,15 +127,15 @@ func (vm *VM) Run() error {
 			}
 		case code.OpJump:
 			// Read next uint16 after opcode (current ip)
-			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
-			ip = pos - 1
+			pos := int(code.ReadUint16(ins[ip+1:]))
+			vm.currentFrame().ip = pos - 1
 		case code.OpJumpNotTruthy:
-			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
-			ip += 2
+			pos := int(code.ReadUint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
 
 			condition := vm.pop()
 			if !isTruthy(condition) {
-				ip = pos - 1
+				vm.currentFrame().ip = pos - 1
 			}
 		case code.OpNull:
 			err := vm.push(Null)
@@ -124,24 +143,24 @@ func (vm *VM) Run() error {
 				return err
 			}
 		case code.OpSetGlobal:
-			index := code.ReadUint16(vm.instructions[ip+1:])
-			ip += 2
+			index := code.ReadUint16(ins[ip+1:])
+			vm.currentFrame().ip += 2
 
 			vm.globals[index] = vm.pop()
 
 		case code.OpGetGlobal:
 			// Read index off of instruction
-			index := int(code.ReadUint16(vm.instructions[ip+1:]))
+			index := int(code.ReadUint16(ins[ip+1:]))
 
-			ip += 2
+			vm.currentFrame().ip += 2
 			err := vm.push(vm.globals[index])
 			if err != nil {
 				return err
 			}
 
 		case code.OpArray:
-			size := code.ReadUint16(vm.instructions[ip+1:])
-			ip += 2
+			size := code.ReadUint16(ins[ip+1:])
+			vm.currentFrame().ip += 2
 			arr := make([]object.Object, size)
 
 			// These are gonna be right to left
@@ -159,8 +178,8 @@ func (vm *VM) Run() error {
 			}
 
 		case code.OpHash:
-			size := code.ReadUint16(vm.instructions[ip+1:])
-			ip += 2
+			size := code.ReadUint16(ins[ip+1:])
+			vm.currentFrame().ip += 2
 
 			pairs := make(map[object.HashKey]object.HashPair)
 
@@ -389,6 +408,20 @@ func (vm *VM) pop() object.Object {
 	o := vm.stack[vm.sp-1]
 	vm.sp--
 	return o
+}
+
+func (vm *VM) currentFrame() *Frame {
+	return vm.frames[vm.framesIndex-1]
+}
+
+func (vm *VM) pushFrame(f *Frame) {
+	vm.frames[vm.framesIndex] = f
+	vm.framesIndex++
+}
+
+func (vm *VM) popFrame() *Frame {
+	vm.framesIndex--
+	return vm.frames[vm.framesIndex]
 }
 
 func nativeBoolToBooleanObject(input bool) *object.Boolean {
