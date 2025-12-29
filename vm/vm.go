@@ -188,6 +188,12 @@ func (vm *VM) Run() error {
 			if err != nil {
 				return err
 			}
+		case code.OpIndex:
+			err := vm.executeIndexOperation()
+			if err != nil {
+				return err
+			}
+
 		case code.OpPop:
 			vm.pop()
 		}
@@ -195,6 +201,63 @@ func (vm *VM) Run() error {
 	}
 
 	return nil
+}
+
+func (vm *VM) executeIndexOperation() error {
+	index := vm.pop()
+	container := vm.pop()
+
+	switch {
+
+	case container.Type() == object.ARRAY_OBJ && index.Type() == object.INTEGER_OBJ:
+		return vm.executeArrayIndexOperation(container, index)
+	case container.Type() == object.HASH_OBJ:
+		return vm.executeHashIndexOperation(container, index)
+	default:
+		return fmt.Errorf("Unknown operands for index, %q and %q", container.Type(), index.Type())
+	}
+}
+
+func (vm *VM) executeHashIndexOperation(hashObj object.Object, index object.Object) error {
+	hash, ok := hashObj.(*object.Hash)
+
+	if !ok {
+		return fmt.Errorf("Value is not hash, %q", hashObj.Inspect())
+	}
+
+	idx, ok := index.(object.Hashable)
+
+	if !ok {
+		return fmt.Errorf("Index is not hashable, %q", index.Inspect())
+	}
+
+	pair, ok := hash.Pairs[idx.HashKey()]
+
+	if !ok {
+		return vm.push(Null)
+	} else {
+		return vm.push(pair.Value)
+	}
+}
+
+func (vm *VM) executeArrayIndexOperation(array object.Object, index object.Object) error {
+	arr, ok := array.(*object.Array)
+
+	if !ok {
+		return fmt.Errorf("Value is not array, %q", array.Inspect())
+	}
+
+	idx, ok := index.(*object.Integer)
+
+	if !ok {
+		return fmt.Errorf("Index is not number, %q", index.Inspect())
+	}
+
+	if idx.Value < 0 || int(idx.Value) >= len(arr.Elements) {
+		return vm.push(Null)
+	} else {
+		return vm.push(arr.Elements[idx.Value])
+	}
 }
 
 func (vm *VM) executeBinaryOperation(op code.Opcode) error {

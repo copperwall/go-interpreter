@@ -37,6 +37,7 @@ const (
 	// Data Types
 	OpArray
 	OpHash
+	OpIndex
 )
 
 type Definition struct {
@@ -72,6 +73,8 @@ var definitions = map[Opcode]*Definition{
 	// Data Types
 	OpArray: {"OpArray", []int{2}}, // Arg is number of objects to capture
 	OpHash:  {"OpHash", []int{2}},  // Arg is number of objects to capture
+
+	OpIndex: {"OpIndex", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {
