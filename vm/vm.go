@@ -69,6 +69,8 @@ func (vm *VM) Run() error {
 	var ins code.Instructions
 	var op code.Opcode
 
+	fmt.Printf("ins (%+v)\n", ins)
+
 	// ip is instruction pointer
 	// it starts at the beginning an goes until there are no instructions left.
 	// vm.instructions is a []byte, meaning we need to parse instructions correctly
@@ -80,6 +82,8 @@ func (vm *VM) Run() error {
 		ins = vm.currentFrame().Instructions()
 		op = code.Opcode(ins[ip])
 
+		fmt.Println(op)
+		fmt.Println(vm.constants)
 		// Decode the opcode
 		switch op {
 		case code.OpConstant:
@@ -212,6 +216,29 @@ func (vm *VM) Run() error {
 			if err != nil {
 				return err
 			}
+		case code.OpReturnValue:
+			returnValue := vm.pop()
+
+			vm.popFrame()
+			vm.pop()
+
+			err := vm.push(returnValue)
+
+			if err != nil {
+				return err
+			}
+		case code.OpCall:
+			// Take value off of stack
+			// Execute the instructions
+			// Place value from the function back on the stack
+			fn, ok := vm.stack[vm.sp-1].(*object.CompiledFunction)
+
+			if !ok {
+				return fmt.Errorf("calling non-function")
+			}
+
+			frame := NewFrame(fn)
+			vm.pushFrame(frame)
 
 		case code.OpPop:
 			vm.pop()
