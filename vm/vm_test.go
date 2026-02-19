@@ -362,3 +362,42 @@ func TestCallingFunctionsWithReturnStatement(t *testing.T) {
 
 	runVmTests(t, tests)
 }
+
+func TestCallingFunctionsWithNoReturnValue(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+				let x = fn() { };
+				x();
+			`,
+			expected: Null,
+		},
+		{
+			input: `
+				let x = fn() { };
+				let y = fn() { x() }
+				x();
+				y();
+			`,
+			expected: Null,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestFirstClassFunctions(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+				let returnOne = fn() { 1 };
+				let returnOneReturner = fn() { returnOne };
+
+				returnOneReturner()();
+			`,
+			expected: 1,
+		},
+	}
+
+	runVmTests(t, tests)
+}
