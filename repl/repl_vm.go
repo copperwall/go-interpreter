@@ -38,14 +38,6 @@ func StartVMRepl(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		// TODO: Repl not working with function let statements
-		// when calling because
-		// constants in repl is being reset to empty slice.
-		// Does this mean the repl is missing an instruction to load in a
-		// global set in the previous line?
-		fmt.Println("constants")
-		fmt.Println(constants)
-
 		c := compiler.NewWithState(symbolTable, constants)
 		err := c.Compile(program)
 
@@ -54,7 +46,10 @@ func StartVMRepl(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		machine := vm.NewWithGlobalsStore(c.Bytecode(), globals)
+		code := c.Bytecode()
+		constants = code.Constants
+
+		machine := vm.NewWithGlobalsStore(code, globals)
 		err = machine.Run()
 
 		if err != nil {

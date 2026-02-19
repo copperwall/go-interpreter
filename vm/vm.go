@@ -69,8 +69,6 @@ func (vm *VM) Run() error {
 	var ins code.Instructions
 	var op code.Opcode
 
-	fmt.Printf("ins (%+v)\n", ins)
-
 	// ip is instruction pointer
 	// it starts at the beginning an goes until there are no instructions left.
 	// vm.instructions is a []byte, meaning we need to parse instructions correctly
@@ -82,8 +80,6 @@ func (vm *VM) Run() error {
 		ins = vm.currentFrame().Instructions()
 		op = code.Opcode(ins[ip])
 
-		fmt.Println(op)
-		fmt.Println(vm.constants)
 		// Decode the opcode
 		switch op {
 		case code.OpConstant:
