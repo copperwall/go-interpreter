@@ -110,8 +110,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		symbol := c.symbolTable.Define(node.Name.Value)
 
-		// TODO: Need to emit set with global index
-		c.emit(code.OpSetGlobal, symbol.Index)
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
 	case *ast.Identifier:
 		// Look up in global symbol table
 		symbol, ok := c.symbolTable.Resolve(node.Value)
@@ -119,7 +122,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return fmt.Errorf("undefined variable %s", node.Value)
 		}
 
-		c.emit(code.OpGetGlobal, symbol.Index)
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpGetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpGetLocal, symbol.Index)
+		}
 
 	case *ast.InfixExpression:
 		if node.Operator == "<" {
@@ -398,12 +405,18 @@ func (c *Compiler) enterScope() {
 	}
 	c.scopes = append(c.scopes, scope)
 	c.scopeIndex++
+
+	// Add new scope for local bindings
+	c.symbolTable = NewEnclosedSymbolTable(c.symbolTable)
 }
 
 func (c *Compiler) leaveScope() code.Instructions {
 	instructions := c.currentInstructions()
 	c.scopes = c.scopes[:len(c.scopes)-1]
 	c.scopeIndex--
+
+	// Remove local bindings scope
+	c.symbolTable = c.symbolTable.Outer
 
 	return instructions
 }
