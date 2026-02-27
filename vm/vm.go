@@ -33,7 +33,10 @@ type VM struct {
 
 func New(bytecode *compiler.Bytecode) *VM {
 	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
-	mainFrame := NewFrame(mainFn)
+	mainClosure := &object.Closure{
+		Fn: mainFn,
+	}
+	mainFrame := NewFrame(mainClosure, 0)
 
 	frames := make([]*Frame, MaxFrames)
 	frames[0] = mainFrame
@@ -76,9 +79,18 @@ func (vm *VM) Run() error {
 	for vm.currentFrame().ip < len(vm.currentFrame().Instructions())-1 {
 		vm.currentFrame().ip++
 
+		// fmt.Printf("ip: %d frame index: %d stack pointer: %d\n", vm.currentFrame().ip, vm.framesIndex, vm.sp)
+
 		ip = vm.currentFrame().ip
 		ins = vm.currentFrame().Instructions()
 		op = code.Opcode(ins[ip])
+
+		// def, err := code.Lookup(byte(op))
+
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// fmt.Printf("Excecuting opcode: %s at ip: %d on frame %d\n", def.Name, ip, vm.framesIndex)
 
 		// Decode the opcode
 		switch op {
@@ -91,6 +103,16 @@ func (vm *VM) Run() error {
 			// The operand in a OpConstant instruction is an index into the vm's constants table,
 			// not the constant value itself.
 			err := vm.push(vm.constants[constIndex])
+			if err != nil {
+				return err
+			}
+		case code.OpClosure:
+			constIdx := code.ReadUint16(ins[ip+1:])
+			numFree := code.ReadUint8(ins[ip+3:])
+			vm.currentFrame().ip += 3
+
+			err := vm.pushClosure(int(constIdx), int(numFree))
+
 			if err != nil {
 				return err
 			}
@@ -215,8 +237,8 @@ func (vm *VM) Run() error {
 		case code.OpReturnValue:
 			returnValue := vm.pop()
 
-			vm.popFrame()
-			vm.pop()
+			frame := vm.popFrame()
+			vm.sp = frame.basePointer - 1
 
 			err := vm.push(returnValue)
 
@@ -224,8 +246,8 @@ func (vm *VM) Run() error {
 				return err
 			}
 		case code.OpReturn:
-			vm.popFrame()
-			vm.pop()
+			frame := vm.popFrame()
+			vm.sp = frame.basePointer - 1
 
 			err := vm.push(Null)
 
@@ -233,23 +255,105 @@ func (vm *VM) Run() error {
 				return err
 			}
 		case code.OpCall:
-			// Take value off of stack
-			// Execute the instructions
-			// Place value from the function back on the stack
-			fn, ok := vm.stack[vm.sp-1].(*object.CompiledFunction)
+			// Read index off of instruction
+			numArgs := int(code.ReadUint8(ins[ip+1:]))
+			vm.currentFrame().ip++
 
-			if !ok {
-				return fmt.Errorf("calling non-function")
+			err := vm.executeCall(numArgs)
+
+			if err != nil {
+				return err
 			}
 
-			frame := NewFrame(fn)
-			vm.pushFrame(frame)
+		case code.OpSetLocal:
+			// Read index off of instruction
+			index := int(code.ReadUint8(ins[ip+1:]))
+
+			// Increment ip because we read off operand
+			vm.currentFrame().ip += 1
+			frame := vm.currentFrame()
+
+			vm.stack[frame.basePointer+index] = vm.pop()
+			// Place index
+		case code.OpGetLocal:
+			// Read index off of instruction
+			index := int(code.ReadUint8(ins[ip+1:]))
+			vm.currentFrame().ip += 1
+			frame := vm.currentFrame()
+
+			err := vm.push(vm.stack[frame.basePointer+index])
+
+			if err != nil {
+				return err
+			}
+		case code.OpGetBuiltin:
+			index := int(code.ReadUint8(ins[ip+1:]))
+			vm.currentFrame().ip += 1
+
+			definition := object.Builtins[index]
+			err := vm.push(definition.Builtin)
+
+			if err != nil {
+				return err
+			}
+		case code.OpGetFree:
+			freeIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			currentClosure := vm.currentFrame().cl
+			err := vm.push(currentClosure.Free[freeIndex])
+			if err != nil {
+				return err
+			}
+
+		// When we see this, we put the current closure value on the stack
+		case code.OpCurrentClosure:
+			currentClosure := vm.currentFrame().cl
+
+			err := vm.push(currentClosure)
+			if err != nil {
+				return err
+			}
 
 		case code.OpPop:
 			vm.pop()
 		}
 
 	}
+
+	return nil
+}
+
+func (vm *VM) executeCall(numArgs int) error {
+	// Value is at
+	fn := vm.stack[vm.sp-1-numArgs]
+
+	switch callee := fn.(type) {
+	case *object.Closure:
+		// Do regular calling convention in callFunction
+		return vm.callFunction(callee, numArgs)
+	case *object.Builtin:
+		// Do builtin calling convention
+		return vm.callBuiltin(callee, numArgs)
+	default:
+		return fmt.Errorf("calling non-closure and non-built-in")
+	}
+}
+
+func (vm *VM) callBuiltin(fn *object.Builtin, numArgs int) error {
+	// read off arguments in between function and stack
+	args := vm.stack[vm.sp-numArgs : vm.sp]
+
+	result := fn.Fn(args...)
+
+	vm.sp = vm.sp - numArgs - 1
+
+	if result != nil {
+		vm.push(result)
+	} else {
+		vm.push(Null)
+	}
+	// Check if it's an error type
 
 	return nil
 }
@@ -420,11 +524,28 @@ func (vm *VM) executeIntegerComparison(op code.Opcode, left, right object.Object
 	}
 }
 
+func (vm *VM) callFunction(cl *object.Closure, numArgs int) error {
+	// Take value off of stack
+	// Execute the instructions
+	// Place value from the function back on the stack
+	if cl.Fn.NumParameters != numArgs {
+		return fmt.Errorf("wrong number of arguments: want=%d, got=%d", cl.Fn.NumParameters, numArgs)
+	}
+
+	frame := NewFrame(cl, vm.sp-numArgs)
+	vm.pushFrame(frame)
+	// Leave NumLocals spaces on the stack for function locals
+	vm.sp = frame.basePointer + cl.Fn.NumLocals
+
+	return nil
+}
+
 func (vm *VM) LastPoppedStackElem() object.Object {
 	return vm.stack[vm.sp]
 }
 
 func (vm *VM) push(obj object.Object) error {
+	// fmt.Printf("Pushing object %+v to sp %d\n", obj, vm.sp)
 	if vm.sp >= StackSize {
 		return fmt.Errorf("stack overflow, oh no")
 	}
@@ -433,6 +554,32 @@ func (vm *VM) push(obj object.Object) error {
 	vm.sp++
 
 	return nil
+}
+
+func (vm *VM) pushClosure(index int, numFree int) error {
+	constant := vm.constants[index]
+
+	fn, ok := constant.(*object.CompiledFunction)
+
+	if !ok {
+		return fmt.Errorf("not a function: %+v", constant)
+	}
+
+	free := make([]object.Object, numFree)
+
+	for i := 0; i < numFree; i++ {
+		free[i] = vm.stack[vm.sp-numFree+i]
+	}
+
+	// sp 3
+	// free 3
+	// free 2
+	// free 1
+
+	vm.sp -= numFree
+
+	closure := &object.Closure{Fn: fn, Free: free}
+	return vm.push(closure)
 }
 
 // Kind of seems like we should have an error case here
@@ -447,6 +594,7 @@ func (vm *VM) currentFrame() *Frame {
 }
 
 func (vm *VM) pushFrame(f *Frame) {
+	// fmt.Printf("Pushing new frame %+v \n", f)
 	vm.frames[vm.framesIndex] = f
 	vm.framesIndex++
 }

@@ -906,6 +906,37 @@ func TestParsingHashLiteralsWithExpressionValues(t *testing.T) {
 	}
 }
 
+func TestFunctionLiteralWithName(t *testing.T) {
+	input := `let myFunction = fn() { }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Body does not contain %d statements. got %d\n", 1, len(program.Statements))
+	}
+
+	// We want to test that the name is myFunction on the FunctionLiteral
+
+	stmt, ok := program.Statements[0].(*ast.LetStatement)
+
+	if !ok {
+		t.Fatalf("Expected LetStatement, got %T", stmt)
+	}
+
+	fn, ok := stmt.Value.(*ast.FunctionLiteral)
+	if !ok {
+		t.Fatalf("Expected FunctionLiteral value, got %T", fn)
+	}
+
+	if fn.Name != stmt.Name.Value {
+		t.Fatalf("Expected function name to be %q, got %q", stmt.Name.Value, fn.Name)
+	}
+
+}
+
 func testIdentifier(t *testing.T, exp ast.Expression, value string) bool {
 	// Cast expression which can be false okay
 	ident, ok := exp.(*ast.Identifier)

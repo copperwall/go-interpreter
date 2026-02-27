@@ -151,7 +151,12 @@ func applyFunction(fn object.Object, args []object.Object) object.Object {
 		return unwrapReturnValue(evaluated)
 
 	case *object.Builtin:
-		return fn.Fn(args...)
+		res := fn.Fn(args...)
+
+		if res == nil {
+			return NULL
+		}
+		return res
 
 	default:
 		return newError("not a function: %s", fn.Type())

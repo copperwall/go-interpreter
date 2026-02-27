@@ -37,6 +37,10 @@ const (
 	OpGetLocal
 	OpSetLocal
 
+	OpGetBuiltin
+
+	OpGetFree
+
 	// Data Types
 	OpArray
 	OpHash
@@ -45,6 +49,9 @@ const (
 	OpCall
 	OpReturnValue
 	OpReturn
+
+	OpClosure
+	OpCurrentClosure
 )
 
 type Definition struct {
@@ -81,6 +88,11 @@ var definitions = map[Opcode]*Definition{
 	OpGetLocal: {"OpGetLocal", []int{1}},
 	OpSetLocal: {"OpSetLocal", []int{1}},
 
+	// Builtin Functions
+	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
+
+	OpGetFree: {"OpGetFree", []int{1}},
+
 	// Data Types
 	OpArray: {"OpArray", []int{2}}, // Arg is number of objects to capture
 	OpHash:  {"OpHash", []int{2}},  // Arg is number of objects to capture
@@ -88,9 +100,15 @@ var definitions = map[Opcode]*Definition{
 	OpIndex: {"OpIndex", []int{}},
 
 	// Functions
-	OpCall:        {"OpCall", []int{}},
+	OpCall:        {"OpCall", []int{1}},
 	OpReturnValue: {"OpReturnValue", []int{}},
 	OpReturn:      {"OpReturn", []int{}},
+
+	// First operand is constant index (index in constants pool to find the CompiledFunction)
+	// Second operand is how many free variables sit on the stack and should be transferred to the closure.
+	OpClosure: {"OpClosure", []int{2, 1}},
+
+	OpCurrentClosure: {"OpCurrentClosure", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {
@@ -193,6 +211,8 @@ func (ins Instructions) fmtInstruction(def *Definition, operands []int) string {
 		return def.Name
 	case 1:
 		return fmt.Sprintf("%s %d", def.Name, operands[0])
+	case 2:
+		return fmt.Sprintf("%s %d %d", def.Name, operands[0], operands[1])
 	}
 
 	return fmt.Sprintf("ERROR: unhandled operandCount for %s\n", def.Name)

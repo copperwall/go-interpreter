@@ -3,10 +3,10 @@ package run
 import (
 	"fmt"
 	"io"
-	"monkey/evaluator"
+	"monkey/compiler"
 	"monkey/lexer"
-	"monkey/object"
 	"monkey/parser"
+	"monkey/vm"
 	"os"
 )
 
@@ -25,8 +25,19 @@ func RunProgramFromFile(filename string) {
 		return
 	}
 
-	evaluated := evaluator.Eval(program, object.NewEnvironment())
-	fmt.Println(evaluated.Inspect())
+	c := compiler.New()
+	c.Compile(program)
+
+	bytecode := c.Bytecode()
+
+	for _, constant := range bytecode.Constants {
+		fmt.Println(constant.Inspect())
+	}
+	// fmt.Println(bytecode.Instructions)
+
+	v := vm.New(bytecode)
+	v.Run()
+	fmt.Println(v.LastPoppedStackElem().Inspect())
 }
 
 func printParserErrors(out io.Writer, errors []string) {

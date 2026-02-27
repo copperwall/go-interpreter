@@ -3,8 +3,11 @@ package compiler
 type SymbolScope string
 
 const (
-	LocalScope  SymbolScope = "LOCAL"
-	GlobalScope SymbolScope = "GLOBAL"
+	LocalScope    SymbolScope = "LOCAL"
+	GlobalScope   SymbolScope = "GLOBAL"
+	BuiltinScope  SymbolScope = "BUILTIN"
+	FreeScope     SymbolScope = "FREE"
+	FunctionScope SymbolScope = "FUNCTION"
 )
 
 type Symbol struct {
@@ -15,14 +18,17 @@ type Symbol struct {
 
 type SymbolTable struct {
 	Outer          *SymbolTable
+	FreeSymbols    []Symbol
 	store          map[string]Symbol
 	numDefinitions int
 }
 
 func NewSymbolTable() *SymbolTable {
 	s := make(map[string]Symbol)
+	free := []Symbol{}
 	return &SymbolTable{
-		store: s,
+		store:       s,
+		FreeSymbols: free,
 	}
 }
 
@@ -47,12 +53,51 @@ func (s *SymbolTable) Define(name string) Symbol {
 	return symbol
 }
 
+func (s *SymbolTable) DefineBuiltin(index int, name string) Symbol {
+	symbol := Symbol{Name: name, Index: index, Scope: BuiltinScope}
+	s.store[name] = symbol
+	return symbol
+}
+
+func (s *SymbolTable) DefineFunctionName(name string) Symbol {
+	symbol := Symbol{Name: name, Scope: FunctionScope, Index: 0}
+	s.store[name] = symbol
+	return symbol
+}
+
 func (s *SymbolTable) Resolve(name string) (Symbol, bool) {
 	obj, ok := s.store[name]
 
 	if !ok && s.Outer != nil {
-		return s.Outer.Resolve(name)
+		obj, ok = s.Outer.Resolve(name)
+
+		if !ok {
+			return obj, ok
+		}
+
+		if obj.Scope == GlobalScope || obj.Scope == BuiltinScope {
+			return obj, ok
+		}
+
+		// If this was a local in a higher scope, mark it as free
+		free := s.defineFree(obj)
+		return free, true
 	}
 
 	return obj, ok
+}
+
+func (s *SymbolTable) defineFree(original Symbol) Symbol {
+	// add original to FreeSymbols
+	// Create new one as a FreeSymbol scope in main symbols
+	s.FreeSymbols = append(s.FreeSymbols, original)
+
+	newSymbol := Symbol{
+		Name:  original.Name,
+		Scope: FreeScope,
+		Index: len(s.FreeSymbols) - 1,
+	}
+
+	s.store[original.Name] = newSymbol
+	return newSymbol
 }
